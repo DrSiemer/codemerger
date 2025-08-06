@@ -112,15 +112,34 @@ class FileManagerWindow(Toplevel):
         if not os.path.isfile(self.allcode_path):
             return
 
-        with open(self.allcode_path, 'r', encoding='utf-8') as f:
-            try:
+        try:
+            with open(self.allcode_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                self.ordered_selection = data.get('selected_files', [])
-                self.expanded_dirs = set(data.get('expanded_dirs', []))
-            except json.JSONDecodeError:
-                # Handle corrupted .allcode file
-                self.ordered_selection = []
-                self.expanded_dirs = set()
+        except (json.JSONDecodeError, IOError):
+            data = {}
+
+        original_selection = data.get('selected_files', [])
+        self.expanded_dirs = set(data.get('expanded_dirs', []))
+
+        # Filter out files that no longer exist
+        cleaned_selection = [
+            f for f in original_selection
+            if os.path.isfile(os.path.join(self.base_dir, f))
+        ]
+
+        if len(cleaned_selection) < len(original_selection):
+            self.status_var.set("Cleaned missing files from .allcode")
+            data_to_save = {
+                "selected_files": cleaned_selection,
+                "expanded_dirs": sorted(list(self.expanded_dirs)),
+            }
+            try:
+                with open(self.allcode_path, 'w', encoding='utf-8') as f_write:
+                    json.dump(data_to_save, f_write, indent=2)
+            except IOError as e:
+                self.status_var.set(f"Read-only .allcode? Could not auto-clean: {e}")
+
+        self.ordered_selection = cleaned_selection
 
     def populate_tree(self):
         def _has_relevant_files(path):

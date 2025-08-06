@@ -4,6 +4,7 @@
 VENV_DIR="cm-venv"
 START_SCRIPT="src.codemerger"
 SPEC_FILE="codemerger.spec"
+APP_NAME="CodeMerger"
 FLAG=$1
 
 # --- Environment Setup ---
@@ -48,8 +49,27 @@ if [ "$FLAG" == "b" ]; then
     echo "--- Starting PyInstaller Build ---"
     echo "Deleting old build folders..."
     rm -rf dist build
-    echo "Running PyInstaller with $SPEC_FILE..."
-    pyinstaller $SPEC_FILE
+
+    echo "Running PyInstaller with universal2 architecture..."
+    # Added --target-arch=universal2 to create a binary for both Intel and Apple Silicon Macs
+    pyinstaller --target-arch universal2 $SPEC_FILE
+
+    # --- Post-Build Steps for macOS ---
+    if [ -d "dist/$APP_NAME.app" ]; then
+        echo "Applying post-build fixes for macOS..."
+
+        # Make the main binary executable
+        echo "Setting executable permissions..."
+        chmod +x "dist/$APP_NAME.app/Contents/MacOS/$APP_NAME"
+
+        # Create standard directories to prevent warnings
+        echo "Creating optional bundle directories..."
+        mkdir -p "dist/$APP_NAME.app/Contents/Extensions"
+        mkdir -p "dist/$APP_NAME.app/Contents/Plugins"
+
+        echo "macOS post-build fixes complete."
+    fi
+
     echo ""
     echo "--- Build Complete! ---"
     echo "Application is located in the 'dist' folder."

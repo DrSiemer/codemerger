@@ -1,6 +1,6 @@
 name: Create Release
 
-# Run when a new tag is pushed (format v*.*.*)
+# Runs when a new tag is pushed (format v*.*.*)
 on:
   push:
     tags:
@@ -20,11 +20,7 @@ jobs:
         run: |
           TAG="${{ github.ref_name }}"
           echo "Validating tag: $TAG"
-
-          # Get the commit hash the tag points to
           TAG_COMMIT_HASH=$(git rev-parse "$TAG")
-
-          # Check if that commit is an ancestor of the master branch.
           if ! git branch -r --contains "$TAG_COMMIT_HASH" | grep -q "origin/master"; then
             echo "::error::Tag $TAG points to a commit that is not on the 'master' branch."
             echo ""
@@ -36,11 +32,10 @@ jobs:
             echo ""
             exit 1
           fi
-
           echo "Tag validation successful: $TAG is on the master branch."
 
-  # Build for Windows
   build-windows:
+    name: Build for Windows
     needs: validate-tag
     runs-on: windows-latest
     steps:
@@ -60,10 +55,10 @@ jobs:
           name: CodeMerger-windows-exe
           path: dist/CodeMerger.exe
 
-  # Build for macOS
-  build-mac:
+  build-mac-universal:
+    name: Build Universal macOS App
     needs: validate-tag
-    runs-on: macos-latest
+    runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -71,21 +66,34 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+      - name: Install build dependencies via Homebrew
+        run: brew install jpeg-xl libtiff
+      - name: Install Python dependencies
+        env:
+          ARCHFLAGS: "-arch arm64 -arch x86_64"
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --no-cache-dir --no-binary Pillow -r requirements.txt
+          python -m pip install delocate
       - name: Build with PyInstaller
         run: pyinstaller codemerger.spec
-      - name: Compress .app into a .zip file
-        run: zip -r dist/CodeMerger-macOS.zip dist/CodeMerger.app
+      - name: Repair app bundle with delocate
+        run: |
+          SCRIPTS_DIR=$(python -c "import sysconfig; print(sysconfig.get_path('scripts'))")
+          "$SCRIPTS_DIR/delocate-path" -v -d dist/CodeMerger.app
+      - name: Zip the application bundle
+        run: |
+          cd dist
+          zip -r ../CodeMerger-macOS.zip CodeMerger.app
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: CodeMerger-macOS-zip
-          path: dist/CodeMerger-macOS.zip
+          path: CodeMerger-macOS.zip
 
-  # Create the GitHub Release (runs after both build jobs have succeeded)
   create-release:
-    needs: [build-windows, build-mac]
+    name: Create GitHub Release
+    needs: [build-windows, build-mac-universal]
     runs-on: ubuntu-latest
     permissions:
       contents: write

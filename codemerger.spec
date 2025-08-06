@@ -12,8 +12,8 @@ data_files = [
 # Define the icon path based on the operating system
 icon_path = 'assets/icon.icns' if sys.platform == 'darwin' else 'assets/icon.ico'
 
-# For macOS, create a universal binary that runs on both Intel (x86_64) and Apple Silicon (arm64)
-target_arch_value = 'universal2' if sys.platform == 'darwin' else None
+# Define the target architecture
+target_architecture = 'universal2' if sys.platform == 'darwin' else None
 
 a = Analysis(
     ['run.py'],
@@ -22,7 +22,7 @@ a = Analysis(
     datas=data_files,
     hiddenimports=[
         'pyperclip.pyobjc_clipboard',
-        'PIL.ImageTk'
+        'PIL.ImageTk',
     ],
     hookspath=[],
     hooksconfig={},
@@ -49,10 +49,10 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=target_arch_value,
+    target_arch=target_architecture,
     codesign_identity=None,
     entitlements_file=None,
-    icon=icon_path
+    icon=icon_path,
 )
 
 # macOS .app bundle
